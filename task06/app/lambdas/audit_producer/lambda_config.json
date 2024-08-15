@@ -16,9 +16,7 @@
       "batch_size": 1
     }
   ],
-  "env_variables": {
-    "table_name": "${target_table}"
-  },
+  "env_variables": { "table_name": "${target_table}" },
   "publish_version": false,
   "url_config": {},
   "ephemeral_storage": 512

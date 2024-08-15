@@ -1,60 +1,51 @@
-const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const { DynamoDBClient, PutItemCommand } = require("@aws-sdk/client-dynamodb");
 const { v4: uuidv4 } = require("uuid");
 
-const docClient = new DynamoDBClient({});
-
+const dynamoDbClient = new DynamoDBClient({});
+const auditTableName = process.env.table_name;
 exports.handler = async (event) => {
-    const tableName = process.env.table_name || 'Audit';
+  for (const record of event.Records) {
+    if (record.eventName === "INSERT") {
+      const newItem = record.dynamodb.NewImage;
+      const auditItem = {
+        id: { S: uuidv4() },
+        itemKey: { S: newItem.key.S },
+        modificationTime: { S: new Date().toISOString() },
+        newValue: {
+          M: {
+            key: { S: newItem.key.S },
+            value: { N: newItem.value.N },
+          },
+        },
+      };
 
-    for (const record of event.Records) {
-        if (record.eventName === 'INSERT' || record.eventName === 'MODIFY' || record.eventName === 'REMOVE') {
-            const auditEntry = createAuditEntry(record);
-            await saveAuditEntry(auditEntry, tableName);
-        }
+      const putItemCommand = new PutItemCommand({
+        TableName: auditTableName,
+        Item: auditItem,
+      });
+
+      await dynamoDbClient.send(putItemCommand);
+    } else if (record.eventName === "MODIFY") {
+      const oldItem = record.dynamodb.OldImage;
+      const newItem = record.dynamodb.NewImage;
+
+      if (oldItem.value.N !== newItem.value.N) {
+        const auditItem = {
+          id: { S: uuidv4() },
+          itemKey: { S: newItem.key.S },
+          modificationTime: { S: new Date().toISOString() },
+          updatedAttribute: { S: "value" },
+          oldValue: { N: oldItem.value.N },
+          newValue: { N: newItem.value.N },
+        };
+
+        const putItemCommand = new PutItemCommand({
+          TableName: auditTableName,
+          Item: auditItem,
+        });
+
+        await dynamoDbClient.send(putItemCommand);
+      }
     }
+  }
 };
-
-function createAuditEntry(record) {
-    const newImage = record.dynamodb.NewImage ? AWS.DynamoDB.Converter.unmarshall(record.dynamodb.NewImage) : null;
-    const oldImage = record.dynamodb.OldImage ? AWS.DynamoDB.Converter.unmarshall(record.dynamodb.OldImage) : null;
-
-    const auditEntry = {
-        id: uuidv4(), 
-        timestamp: new Date().toISOString(),
-        eventName: record.eventName,
-        newImage: newImage || {},
-        oldImage: oldImage || {},
-        changedAttributes: getChangedAttributes(oldImage, newImage)
-    };
-
-    return auditEntry;
-}
-
-function getChangedAttributes(oldImage, newImage) {
-    const changedAttributes = {};
-
-    for (const key in newImage) {
-        if (newImage[key] !== oldImage[key]) {
-            changedAttributes[key] = {
-                old: oldImage ? oldImage[key] : null,
-                new: newImage[key]
-            };
-        }
-    }
-
-    return changedAttributes;
-}
-
-async function saveAuditEntry(auditEntry, tableName) {
-    const params = {
-        TableName: tableName,
-        Item: auditEntry
-    };
-
-    try {
-        await docClient.put(params).promise();
-    } catch (err) {
-        console.error("Error saving audit entry: ", err);
-        throw err;
-    }
-}
