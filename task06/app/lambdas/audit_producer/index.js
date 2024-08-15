@@ -2,7 +2,7 @@ const { DynamoDBClient, PutItemCommand } = require("@aws-sdk/client-dynamodb");
 const { v4: uuidv4 } = require("uuid");
 
 const dynamoDbClient = new DynamoDBClient({});
-const auditTableName = process.env.table_name;
+const auditTableName = "Audit";
 exports.handler = async (event) => {
   for (const record of event.Records) {
     if (record.eventName === "INSERT") {
