@@ -12,12 +12,12 @@
   "event_sources": [
     {
       "resource_type": "dynamodb_trigger",
-      "target_table": "Configuration",
+      "target_table": "Audit",
       "batch_size": 1
     }
   ],
   "env_variables": {
-    "table_name": "Audit"
+    "table_name": "${target_table}"
   },
   "publish_version": false,
   "url_config": {},
