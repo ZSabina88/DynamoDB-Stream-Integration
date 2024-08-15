@@ -17,7 +17,7 @@
     }
   ],
   "env_variables": {
-    "table_name": "${target_table}"
+    "table_name": "Audit"
   },
   "publish_version": false,
   "url_config": {},
